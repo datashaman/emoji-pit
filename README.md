@@ -1,6 +1,6 @@
-# Slack Reaction Rain
+# Emoji Pit
 
-Real-time rain chart of Slack emoji reactions. Each reaction falls and lands in its sentiment group.
+Real-time Slack emoji reaction visualizer with Matter.js 2D physics. Reactions fall and pile up in sentiment groups with realistic collision and rotation.
 
 ## Setup
 
@@ -38,7 +38,7 @@ Open http://localhost:3000 — reactions from any channel the bot is in will fal
 /invite @your-app-name
 ```
 
-Now react to any message in that channel and watch the drops fall.
+Now react to any message in that channel and watch the emoji fall.
 
 ## How it works
 
@@ -46,13 +46,13 @@ Now react to any message in that channel and watch the drops fall.
 Slack workspace
      │  reaction_added event (Socket Mode — no public URL needed)
      ▼
-server.js (Slack Bolt + Node.js)
+server.ts (Slack Bolt + Node.js)
      │  WebSocket broadcast
      ▼
 index.html (browser)
      │  canvas animation
      ▼
-Rain chart — dots fall into sentiment columns
+Emoji pit — reactions fall and pile up with 2D physics
 ```
 
 ## Emoji groups
@@ -70,9 +70,4 @@ Rain chart — dots fall into sentiment columns
 
 ## Deploy
 
-For a shared dashboard (e.g. on a TV in the office):
-
-```bash
-# Railway, Render, or Fly.io — set the three env vars and deploy
-railway up
-```
+For a shared dashboard (e.g. on a TV in the office), deploy to any Node.js host and set the three env vars.
