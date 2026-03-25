@@ -27,7 +27,7 @@ cp .env.example .env
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
 Open http://localhost:3000 — reactions from any channel the bot is in will fall in real-time.
@@ -46,10 +46,13 @@ Now react to any message in that channel and watch the emoji fall.
 Slack workspace
      │  reaction_added event (Socket Mode — no public URL needed)
      ▼
-server.ts (Slack Bolt + Node.js)
+server/plugins/slack.ts (Slack Bolt + Nuxt Nitro)
+     │  EventEmitter bus
+     ▼
+server/routes/_ws.ts (Nitro WebSocket)
      │  WebSocket broadcast
      ▼
-index.html (browser)
+pages/index.vue (browser)
      │  canvas animation
      ▼
 Emoji pit — reactions fall and pile up with 2D physics
@@ -71,3 +74,8 @@ Emoji pit — reactions fall and pile up with 2D physics
 ## Deploy
 
 For a shared dashboard (e.g. on a TV in the office), deploy to any Node.js host and set the three env vars.
+
+```bash
+npm run build
+node .output/server/index.mjs
+```

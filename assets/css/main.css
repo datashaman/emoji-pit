@@ -1,0 +1,398 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+#__nuxt {
+  width: 100%;
+  display: contents;
+}
+
+:root {
+  --shell: #d5d0c8;
+  --shell-light: #e8e4dc;
+  --shell-dark: #b8b3aa;
+  --shell-edge: #c5c0b8;
+  --screen-bg: #2a4a2a;
+  --screen-glow: rgba(120, 220, 80, 0.08);
+  --lcd-tint: rgba(120, 220, 80, 0.03);
+  --text-lcd: #3a5a1a;
+  --text-dim: #5a8a3a;
+  --text-label: #8a8578;
+  --accent-a: #ef4444;
+  --accent-b: #facc15;
+  --accent-x: #22c55e;
+  --accent-y: #3b82f6;
+  --btn-face: #c0bbb2;
+  --btn-shadow: #a09a90;
+  --btn-highlight: #d8d4cc;
+  --led-green: #22c55e;
+  --led-red: #ef4444;
+  --led-off: #a0a090;
+  --grid: rgba(60, 100, 40, 0.1);
+  --ground: rgba(60, 100, 40, 0.3);
+  --surface-alt: rgba(60, 100, 40, 0.05);
+  --body-bg: #c0baa8;
+  --stat-bg: rgba(0,0,0,0.08);
+  --stat-border: rgba(0,0,0,0.1);
+  --screen-border: #1a3a1a;
+  --scanline: rgba(0,0,0,0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shell: #2d2d3d;
+    --shell-light: #3a3a4d;
+    --shell-dark: #1e1e2a;
+    --shell-edge: #444460;
+    --screen-bg: #0a1628;
+    --screen-glow: rgba(56, 189, 248, 0.08);
+    --lcd-tint: rgba(56, 189, 248, 0.03);
+    --text-lcd: #38bdf8;
+    --text-dim: #1e3a5f;
+    --text-label: #7a7a9a;
+    --btn-face: #404058;
+    --btn-shadow: #2a2a3a;
+    --btn-highlight: #52526a;
+    --led-green: #4ade80;
+    --led-red: #f87171;
+    --led-off: #2a3a2a;
+    --grid: rgba(56, 189, 248, 0.06);
+    --ground: rgba(56, 189, 248, 0.2);
+    --surface-alt: rgba(56, 189, 248, 0.03);
+    --body-bg: #1a1a2e;
+    --stat-bg: rgba(0,0,0,0.3);
+    --stat-border: rgba(56,189,248,0.1);
+    --screen-border: #111;
+    --scanline: rgba(0,0,0,0.08);
+  }
+}
+
+body {
+  background: var(--body-bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--text-lcd);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  width: 100%;
+}
+
+/* ── Console shell ──────────────────────────────────────────── */
+.console {
+  background: var(--shell);
+  border-radius: 12px 12px 20px 20px;
+  padding: 20px 24px 20px;
+  max-width: 1200px;
+  width: 100%;
+  box-shadow:
+    0 2px 0 var(--shell-edge),
+    0 4px 0 var(--shell-dark),
+    0 8px 24px rgba(0,0,0,0.5),
+    inset 0 1px 0 var(--shell-light);
+  position: relative;
+}
+
+/* ── Header area ────────────────────────────────────────────── */
+.console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+h1 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.5);
+}
+
+.power-led {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--led-off);
+  transition: all 0.3s;
+}
+.power-led.on {
+  background: var(--led-green);
+  box-shadow: 0 0 8px var(--led-green), 0 0 20px rgba(74,222,128,0.3);
+}
+.power-led.error {
+  background: var(--led-red);
+  box-shadow: 0 0 8px var(--led-red), 0 0 20px rgba(248,113,113,0.3);
+}
+
+.status-text {
+  font-size: 13px;
+  color: var(--text-label);
+  letter-spacing: 0.05em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Screen bezel ───────────────────────────────────────────── */
+.screen-bezel {
+  background: var(--screen-border);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,0.8),
+    0 1px 0 var(--shell-light);
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--screen-bg);
+  box-shadow: inset 0 0 40px var(--screen-glow);
+}
+
+/* Scanline overlay */
+.screen::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--scanline) 2px,
+    var(--scanline) 4px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+canvas { display: block; width: 100%; border-radius: 4px; }
+
+.emoji-layer {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.emoji-drop {
+  position: absolute;
+  font-size: 20px;
+  line-height: 1;
+  text-align: center;
+  width: 28px;
+  height: 28px;
+  margin-left: -14px;
+  margin-top: -14px;
+  will-change: transform;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+
+.emoji-drop img { width: 22px; height: 22px; display: block; margin: 3px auto; }
+
+.emoji-drop.removing {
+  opacity: 0;
+  transform: scale(0.3) !important;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out !important;
+}
+
+/* ── Axis labels (inside screen) ────────────────────────────── */
+.axis {
+  display: flex;
+  margin-top: 6px;
+  padding: 0 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--text-lcd);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  height: 22px;
+  align-items: center;
+}
+.axis span { flex: 1; text-align: center; }
+
+/* ── Control panel (below screen) ───────────────────────────── */
+.control-panel {
+  display: flex;
+  align-items: center;
+  margin-top: 20px;
+  gap: 12px;
+}
+
+/* ── Stats as LCD readout ───────────────────────────────────── */
+.stats {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stat {
+  flex: 1;
+  background: var(--stat-bg);
+  border: 1px solid var(--stat-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.stat-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--text-lcd);
+  display: block;
+  text-shadow: 0 0 8px rgba(56,189,248,0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Console buttons ────────────────────────────────────────── */
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+button {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Round arcade buttons */
+.btn-round {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--btn-highlight) 0%, var(--btn-face) 40%, var(--btn-shadow) 100%);
+  color: rgba(255,255,255,0.7);
+  box-shadow:
+    0 3px 0 var(--btn-shadow),
+    0 4px 8px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-round:hover {
+  background: linear-gradient(180deg, #5e5e78 0%, var(--btn-highlight) 40%, var(--btn-face) 100%);
+}
+
+.btn-round:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 var(--btn-shadow),
+    0 1px 4px rgba(0,0,0,0.4),
+    inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.btn-round.active {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 40%, #3730a3 100%);
+  color: #fff;
+  box-shadow:
+    0 3px 0 #312e81,
+    0 4px 8px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    0 0 12px rgba(99,102,241,0.3);
+}
+
+/* Color-coded button labels */
+.btn-a { color: var(--text-label); }
+.btn-b { color: var(--accent-b); }
+.btn-x { color: var(--accent-x); }
+
+/* Pill button (select/start style) */
+.btn-pill {
+  background: var(--shell-dark);
+  color: var(--text-label);
+  border-radius: 14px;
+  padding: 10px 20px;
+  min-width: 100px;
+  text-align: center;
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.5),
+    0 1px 0 var(--shell-light);
+  font-size: 7px;
+}
+
+.btn-pill:hover { color: var(--text-lcd); }
+.btn-pill:active { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(0,0,0,0.6); }
+
+/* ── Button group with labels ───────────────────────────────── */
+.btn-group {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.btn-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: var(--text-label);
+  text-transform: uppercase;
+}
+
+/* ── Speaker grille ─────────────────────────────────────────── */
+.speaker {
+  display: flex;
+  gap: 3px;
+  transform: rotate(-30deg);
+  margin-left: 12px;
+}
+.speaker-line {
+  width: 3px;
+  height: 32px;
+  border-radius: 1px;
+  background: var(--shell-dark);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* ── Model label ────────────────────────────────────────────── */
+.model-label {
+  text-align: center;
+  margin-top: 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: var(--text-label);
+  letter-spacing: 0.15em;
+  opacity: 0.5;
+}

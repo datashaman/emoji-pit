@@ -6,6 +6,6 @@ export default [
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/"],
+    ignores: ["dist/", ".nuxt/", ".output/"],
   },
 ];

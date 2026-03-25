@@ -1,28 +1,26 @@
 {
   "name": "emoji-pit",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "tsx --watch server.ts",
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "start": "node .output/server/index.mjs",
     "lint": "eslint .",
-    "check": "tsc --noEmit"
+    "check": "nuxt typecheck",
+    "postinstall": "nuxt prepare"
   },
   "dependencies": {
     "@slack/bolt": "^3.19.0",
     "better-sqlite3": "^12.8.0",
-    "dotenv": "^17.3.1",
     "gemoji": "^8.1.0",
-    "ws": "^8.17.0"
+    "nuxt": "^3.17.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.5.0",
-    "@types/ws": "^8.18.1",
     "eslint": "^10.1.0",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.2"
   }
