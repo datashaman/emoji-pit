@@ -3,6 +3,7 @@ import bolt from "@slack/bolt";
 const { App } = bolt;
 import { WebSocket, WebSocketServer } from "ws";
 import { nameToEmoji } from "gemoji";
+import Database from "better-sqlite3";
 import http from "http";
 import fs from "fs";
 import path from "path";
@@ -70,41 +71,42 @@ function resolveEmoji(name: string): { unicode?: string; url?: string } {
   return {};
 }
 
-// ── Reaction history (persisted to disk, replayed to new clients) ─────────────
+// ── Reaction history (persisted to SQLite) ────────────────────────────────────
 interface ReactionRecord {
   emoji: string;
   unicode?: string;
   url?: string;
 }
 
-const HISTORY_FILE = path.join(__dirname, "reactions.json");
+const DATA_DIR = fs.existsSync("/data") ? "/data" : __dirname;
+const DB_PATH = path.join(DATA_DIR, "emoji-pit.db");
+const db = new Database(DB_PATH);
+db.pragma("journal_mode = WAL");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    emoji TEXT NOT NULL,
+    unicode TEXT,
+    url TEXT,
+    created_at INTEGER DEFAULT (unixepoch())
+  )
+`);
+
+const stmtInsert = db.prepare("INSERT INTO reactions (emoji, unicode, url) VALUES (?, ?, ?)");
+const stmtDeleteOne = db.prepare("DELETE FROM reactions WHERE id = (SELECT id FROM reactions WHERE emoji = ? LIMIT 1)");
+const stmtSelectAll = db.prepare("SELECT emoji, unicode, url FROM reactions ORDER BY id");
+const stmtDeleteAll = db.prepare("DELETE FROM reactions");
+const stmtCount = db.prepare("SELECT COUNT(*) as count FROM reactions");
+const stmtCountByEmoji = db.prepare("SELECT emoji, COUNT(*) as count FROM reactions GROUP BY emoji ORDER BY count DESC");
 
 function loadHistory(): ReactionRecord[] {
-  try {
-    const data = fs.readFileSync(HISTORY_FILE, "utf-8");
-    const parsed = JSON.parse(data);
-    if (Array.isArray(parsed)) {
-      console.log(`[history] loaded ${parsed.length} reactions from disk`);
-      return parsed;
-    }
-  } catch {
-    // File doesn't exist yet or is corrupt — start fresh
-  }
-  return [];
+  const rows = stmtSelectAll.all() as ReactionRecord[];
+  console.log(`[history] loaded ${rows.length} reactions from SQLite`);
+  return rows;
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-
-function saveHistory(): void {
-  // Debounce writes — at most once per second
-  if (saveTimer) return;
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(reactionHistory));
-  }, 1000);
-}
-
-const reactionHistory: ReactionRecord[] = loadHistory();
+console.log(`[db] opened ${DB_PATH} (${(stmtCount.get() as { count: number }).count} reactions)`);
 
 // ── HTTP server (serves the chart UI + WebSocket upgrade) ────────────────────
 const httpServer = http.createServer((req, res) => {
@@ -114,8 +116,7 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end(file);
   } else if (req.url === "/reset" && req.method === "POST") {
-    reactionHistory.length = 0;
-    fs.writeFileSync(HISTORY_FILE, "[]");
+    stmtDeleteAll.run();
     broadcast({ type: "reset" });
     console.log("[reset] history cleared");
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -135,9 +136,10 @@ wss.on("connection", (ws) => {
   console.log(`[ws] client connected (${clients.size} total)`);
 
   // Send reaction history for replay
-  if (reactionHistory.length > 0) {
-    ws.send(JSON.stringify({ type: "history", reactions: reactionHistory }));
-    console.log(`[ws] sent ${reactionHistory.length} historical reactions`);
+  const history = loadHistory();
+  if (history.length > 0) {
+    ws.send(JSON.stringify({ type: "history", reactions: history }));
+    console.log(`[ws] sent ${history.length} historical reactions`);
   }
 
   ws.on("close", () => {
@@ -163,8 +165,7 @@ app.event("reaction_added", async ({ event }) => {
   const resolved = resolveEmoji(event.reaction);
   console.log(`[slack] reaction_added: :${event.reaction}: by ${event.user} in ${event.item.channel}`);
 
-  reactionHistory.push({ emoji: event.reaction, ...resolved });
-  saveHistory();
+  stmtInsert.run(event.reaction, resolved.unicode ?? null, resolved.url ?? null);
 
   broadcast({
     type: "reaction",
@@ -212,9 +213,7 @@ app.event("reaction_removed", async ({ event }) => {
   const resolved = resolveEmoji(event.reaction);
   console.log(`[slack] reaction_removed: :${event.reaction}: by ${event.user} in ${event.item.channel}`);
 
-  // Remove first matching reaction from history
-  const idx = reactionHistory.findIndex(r => r.emoji === event.reaction);
-  if (idx !== -1) { reactionHistory.splice(idx, 1); saveHistory(); }
+  stmtDeleteOne.run(event.reaction);
 
   broadcast({
     type: "reaction_removed",
@@ -231,18 +230,13 @@ const DASHBOARD_URL = process.env.DASHBOARD_URL || `http://localhost:${PORT}`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildStatsBlocks(): any[] {
-  const totalReactions = reactionHistory.length;
+  const totalReactions = (stmtCount.get() as { count: number }).count;
 
-  // Count emoji occurrences
+  // Top 10 emoji from DB
+  const emojiRows = stmtCountByEmoji.all() as { emoji: string; count: number }[];
+  const top = emojiRows.slice(0, 10).map(r => [r.emoji, r.count] as [string, number]);
   const counts: Record<string, number> = {};
-  for (const r of reactionHistory) {
-    counts[r.emoji] = (counts[r.emoji] || 0) + 1;
-  }
-
-  // Top 10 emoji
-  const top = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  for (const r of emojiRows) counts[r.emoji] = r.count;
 
   // Build top emoji list
   const chartLines = top.map(([name, count], i) => {
@@ -330,10 +324,11 @@ app.event("app_home_opened", async ({ event }) => {
 });
 
 // Refresh all home tabs periodically (every 30s if there are reactions)
-let lastHistoryLength = reactionHistory.length;
+let lastHistoryCount = (stmtCount.get() as { count: number }).count;
 setInterval(async () => {
-  if (reactionHistory.length !== lastHistoryLength && homeUsers.size > 0) {
-    lastHistoryLength = reactionHistory.length;
+  const currentCount = (stmtCount.get() as { count: number }).count;
+  if (currentCount !== lastHistoryCount && homeUsers.size > 0) {
+    lastHistoryCount = currentCount;
     for (const userId of homeUsers) {
       await publishHome(userId);
     }

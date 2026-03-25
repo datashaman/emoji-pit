@@ -1,0 +1,18 @@
+app = "emoji-pit"
+primary_region = "ord"
+
+[build]
+
+[env]
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[mounts]
+  source = "emoji_pit_data"
+  destination = "/data"
