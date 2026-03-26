@@ -1,4 +1,4 @@
-import { getSession, getBuckets, saveBuckets, getInstallation } from "../../utils/db";
+import { getSessionByToken, getBuckets, saveBuckets, getInstallation } from "../../utils/db";
 
 const DEFAULT_BUCKETS = [
   { label: "Love", position: 0, emojis: JSON.stringify(["heart","hearts","heart_eyes","sparkling_heart","two_hearts","revolving_hearts","heartpulse","orange_heart","yellow_heart","green_heart","blue_heart","purple_heart"]) },
@@ -22,7 +22,7 @@ export default defineEventHandler((event) => {
   if (!token) {
     throw createError({ statusCode: 401, message: "Not authenticated" });
   }
-  const session = getSession(token);
+  const session = getSessionByToken(token);
   if (!session || session.team_id !== teamId) {
     throw createError({ statusCode: 403, message: "Forbidden" });
   }

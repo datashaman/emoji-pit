@@ -1,5 +1,5 @@
 import { bus } from "../utils/bus";
-import { getSession, stmtDeleteTeamReactions } from "../utils/db";
+import { getSessionByToken, stmtDeleteTeamReactions } from "../utils/db";
 
 export default defineEventHandler((event) => {
   const token = getCookie(event, "session");
@@ -7,7 +7,7 @@ export default defineEventHandler((event) => {
     throw createError({ statusCode: 401, message: "Not authenticated" });
   }
 
-  const session = getSession(token);
+  const session = getSessionByToken(token);
   if (!session) {
     throw createError({ statusCode: 401, message: "Invalid session" });
   }

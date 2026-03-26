@@ -1,4 +1,4 @@
-import { getSession, saveBuckets, getInstallation } from "../../utils/db";
+import { getSessionByToken, saveBuckets, getInstallation } from "../../utils/db";
 
 export default defineEventHandler(async (event) => {
   const teamId = getRouterParam(event, "teamId");
@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!token) {
     throw createError({ statusCode: 401, message: "Not authenticated" });
   }
-  const session = getSession(token);
+  const session = getSessionByToken(token);
   if (!session || session.team_id !== teamId) {
     throw createError({ statusCode: 403, message: "Forbidden" });
   }

@@ -224,7 +224,7 @@ export function saveSession(session: SessionRecord): void {
   );
 }
 
-export function getSession(token: string): SessionRecord | undefined {
+export function getSessionByToken(token: string): SessionRecord | undefined {
   return stmtGetSession.get(token) as SessionRecord | undefined;
 }
 

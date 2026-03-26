@@ -6,7 +6,7 @@ export default defineNuxtConfig({
     slackClientSecret: process.env.SLACK_CLIENT_SECRET || "",
     slackSigningSecret: process.env.SLACK_SIGNING_SECRET || "",
     public: {
-      baseUrl: process.env.BASE_URL || "http://localhost:3000",
+      baseUrl: process.env.DASHBOARD_URL || "http://localhost:3000",
     },
   },
 
