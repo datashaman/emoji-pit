@@ -5,7 +5,7 @@ import { consumeTicket } from "../api/auth/ws-ticket.post";
 
 export default defineWebSocketHandler({
   open(peer) {
-    const url = new URL(peer.url || "", "http://localhost");
+    const url = new URL((peer as any).url || "", "http://localhost");
     const ticket = url.searchParams.get("ticket") || "";
     const scope = url.searchParams.get("scope") || "team";
 

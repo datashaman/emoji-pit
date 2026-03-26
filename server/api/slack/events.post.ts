@@ -166,7 +166,8 @@ export default defineEventHandler(async (event) => {
           `${i + 1}. :${r.emoji.replace(/::?skin-tone-\d$/, "")}:  \u00d7 *${r.count}*`
       );
 
-      const blocks: Record<string, unknown>[] = [
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blocks: any[] = [
         {
           type: "header",
           text: { type: "plain_text", text: "Emoji Pit", emoji: true },
