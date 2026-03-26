@@ -148,9 +148,8 @@ export default defineEventHandler(async (event) => {
   else if (slackEvent.type === "app_home_opened") {
     const userId = slackEvent.user;
     try {
-      const PORT = Number(process.env.PORT) || 3000;
-      const DASHBOARD_URL =
-        process.env.DASHBOARD_URL || `http://localhost:${PORT}`;
+      const config = useRuntimeConfig();
+      const DASHBOARD_URL = config.public.baseUrl;
 
       const totalReactions = (
         stmtCountTeam.get(teamId) as { count: number }

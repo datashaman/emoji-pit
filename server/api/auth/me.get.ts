@@ -1,4 +1,4 @@
-import { getSession } from "../../utils/db";
+import { getSessionByToken } from "../../utils/db";
 
 export default defineEventHandler((event) => {
   const token = getCookie(event, "session");
@@ -6,7 +6,7 @@ export default defineEventHandler((event) => {
     return { authenticated: false };
   }
 
-  const session = getSession(token);
+  const session = getSessionByToken(token);
   if (!session) {
     return { authenticated: false };
   }

@@ -1,4 +1,4 @@
-import { getSession } from "../../utils/db";
+import { getSessionByToken } from "../../utils/db";
 
 // Short-lived tickets for WebSocket authentication
 // Since httpOnly cookies can't be read by JS, the client
@@ -18,7 +18,7 @@ export default defineEventHandler((event) => {
     throw createError({ statusCode: 401, message: "Not authenticated" });
   }
 
-  const session = getSession(token);
+  const session = getSessionByToken(token);
   if (!session) {
     throw createError({ statusCode: 401, message: "Invalid session" });
   }

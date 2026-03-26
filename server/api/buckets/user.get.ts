@@ -1,11 +1,11 @@
-import { getSession, getUserBuckets } from "../../utils/db";
+import { getSessionByToken, getUserBuckets } from "../../utils/db";
 
 export default defineEventHandler((event) => {
   const token = getCookie(event, "session");
   if (!token) {
     throw createError({ statusCode: 401, message: "Not authenticated" });
   }
-  const session = getSession(token);
+  const session = getSessionByToken(token);
   if (!session) {
     throw createError({ statusCode: 401, message: "Invalid session" });
   }

@@ -9,7 +9,7 @@ import {
   deleteInstallation,
   getAllInstallations,
   saveSession,
-  getSession,
+  getSessionByToken,
   deleteSession,
   getBuckets,
   saveBuckets,
@@ -99,19 +99,19 @@ describe("sessions", () => {
       is_admin: 1,
     });
 
-    const s = getSession("tok-1");
+    const s = getSessionByToken("tok-1");
     expect(s).toBeDefined();
     expect(s!.user_name).toBe("Alice");
     expect(s!.is_admin).toBe(1);
   });
 
   it("returns undefined for unknown token", () => {
-    expect(getSession("nonexistent")).toBeUndefined();
+    expect(getSessionByToken("nonexistent")).toBeUndefined();
   });
 
   it("deletes a session", () => {
     deleteSession("tok-1");
-    expect(getSession("tok-1")).toBeUndefined();
+    expect(getSessionByToken("tok-1")).toBeUndefined();
   });
 });
 
