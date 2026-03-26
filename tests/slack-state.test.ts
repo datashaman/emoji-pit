@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { generateState, verifyState } from "../server/utils/slack-state";
 
 describe("slack-state", () => {

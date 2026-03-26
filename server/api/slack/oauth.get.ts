@@ -1,6 +1,6 @@
 import { WebClient } from "@slack/web-api";
 import { verifyState } from "../../utils/slack-state";
-import { saveInstallation, getInstallation, saveSession } from "../../utils/db";
+import { saveInstallation, saveSession } from "../../utils/db";
 import { loadCustomEmoji } from "../../utils/emoji";
 
 export default defineEventHandler(async (event) => {
@@ -49,7 +49,6 @@ export default defineEventHandler(async (event) => {
 
   // Create a session for the installer
   const token = crypto.randomUUID();
-  const installation = getInstallation(teamId)!;
   saveSession({
     token,
     team_id: teamId,
