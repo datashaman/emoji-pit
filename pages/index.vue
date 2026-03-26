@@ -555,6 +555,7 @@ onMounted(async () => {
           return;
         }
         if (msg.type === "history") {
+          clearPit();
           msg.reactions.forEach((r: any, i: number) => {
             setTimeout(() => addReaction({ type: "reaction", ...r }), i * 80);
           });
