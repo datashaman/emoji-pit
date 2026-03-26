@@ -65,8 +65,6 @@ db.exec(`
     url         TEXT,
     created_at  INTEGER DEFAULT (unixepoch())
   );
-  CREATE INDEX IF NOT EXISTS idx_reactions_team ON reactions(team_id);
-  CREATE INDEX IF NOT EXISTS idx_reactions_team_user ON reactions(team_id, user_id);
 
   CREATE TABLE IF NOT EXISTS buckets (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,6 +130,12 @@ if (!hasTeamId && columns.length > 0) {
   `);
   console.log("[db] migrated reactions table to include team_id/user_id");
 }
+
+// Create indexes after migration (safe now that team_id column exists)
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_reactions_team ON reactions(team_id);
+  CREATE INDEX IF NOT EXISTS idx_reactions_team_user ON reactions(team_id, user_id);
+`);
 
 // ── Reactions ────────────────────────────────────────────────────────────────
 export const stmtInsertReaction = db.prepare(
