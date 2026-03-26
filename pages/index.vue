@@ -1,11 +1,38 @@
 <template>
-  <div class="console">
+  <!-- Landing page: not authenticated -->
+  <div v-if="authState === 'loading'" class="console">
+    <div class="console-header">
+      <div class="brand"><h1>Emoji Pit</h1></div>
+    </div>
+    <div class="landing">
+      <p>Loading...</p>
+    </div>
+    <div class="model-label">EP-1000 &bull; Slack Reaction Engine</div>
+  </div>
+
+  <div v-else-if="authState === 'unauthenticated'" class="console">
+    <div class="console-header">
+      <div class="brand"><h1>Emoji Pit</h1></div>
+    </div>
+    <div class="landing">
+      <p class="landing-tagline">Watch your Slack reactions pile up in real time</p>
+      <div class="landing-buttons">
+        <a href="/api/slack/install" class="btn-slack">Add to Slack</a>
+        <a href="/api/auth/login" class="btn-slack btn-slack-secondary">Sign in with Slack</a>
+      </div>
+    </div>
+    <div class="model-label">EP-1000 &bull; Slack Reaction Engine</div>
+  </div>
+
+  <!-- Main app: authenticated -->
+  <div v-else class="console">
     <!-- Header: brand + power LED -->
     <div class="console-header">
       <div class="brand">
         <h1>Emoji Pit</h1>
       </div>
       <div class="header-right">
+        <span class="user-badge">{{ session.user_name }}</span>
         <span class="status-text" id="statusText">Connecting...</span>
         <div class="power-led" id="statusDot"></div>
       </div>
@@ -40,8 +67,13 @@
 
       <!-- Buttons -->
       <div class="controls">
+        <button class="btn-pill" id="scopeBtn" @click="toggleScope">
+          {{ scope === 'team' ? 'Team' : 'Mine' }}
+        </button>
         <button class="btn-pill" id="modeBtn" @click="toggleMode">Group</button>
         <button class="btn-pill" @click="resetAll">Reset</button>
+        <a href="/settings" class="btn-pill btn-link">Settings</a>
+        <button class="btn-pill" @click="logout">Logout</button>
       </div>
     </div>
 
@@ -60,14 +92,96 @@ declare const Matter: {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// These are called from the template via @click
+interface Session {
+  authenticated: boolean;
+  team_id: string;
+  user_id: string;
+  user_name: string;
+  is_admin: boolean;
+}
+
+interface Bucket {
+  label: string;
+  position: number;
+  emojis: string[];
+}
+
+const authState = ref<'loading' | 'unauthenticated' | 'authenticated'>('loading');
+const session = ref<Session>({ authenticated: false, team_id: '', user_id: '', user_name: '', is_admin: false });
+const scope = ref<'team' | 'user'>('team');
+
+// Forward refs for imperative functions set inside onMounted
 let _toggleMode: () => void = () => {};
 let _resetAll: () => void = () => {};
+let _reconnect: (() => void) | null = null;
 
 function toggleMode() { _toggleMode(); }
 function resetAll() { _resetAll(); }
 
-onMounted(() => {
+function toggleScope() {
+  scope.value = scope.value === 'team' ? 'user' : 'team';
+  if (_reconnect) _reconnect();
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  authState.value = 'unauthenticated';
+}
+
+onMounted(async () => {
+  // ── Auth check ──────────────────────────────────────────────────────────────
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.authenticated) {
+      session.value = data;
+      authState.value = 'authenticated';
+    } else {
+      authState.value = 'unauthenticated';
+      return;
+    }
+  } catch {
+    authState.value = 'unauthenticated';
+    return;
+  }
+
+  // Wait a tick for the DOM to render the authenticated template
+  await nextTick();
+
+  // ── Fetch buckets ─────────────────────────────────────────────────────────
+  let GROUPS: Bucket[] = [];
+  try {
+    const [teamRes, userRes] = await Promise.all([
+      fetch(`/api/buckets/${session.value.team_id}`),
+      fetch('/api/buckets/user'),
+    ]);
+    const teamBuckets: Bucket[] = await teamRes.json();
+    const userBuckets: Bucket[] = await userRes.json();
+
+    // User overrides replace team defaults by label
+    if (userBuckets.length > 0) {
+      GROUPS = userBuckets;
+    } else {
+      GROUPS = teamBuckets;
+    }
+  } catch {
+    // Fallback to hardcoded defaults
+    GROUPS = [
+      { label: "Love", position: 0, emojis: ["heart","hearts","heart_eyes","sparkling_heart","two_hearts","revolving_hearts","heartpulse","orange_heart","yellow_heart","green_heart","blue_heart","purple_heart"] },
+      { label: "Celebrate", position: 1, emojis: ["tada","confetti_ball","partying_face","balloon","fireworks","sparkles","star","star2","dizzy","trophy"] },
+      { label: "Hype", position: 2, emojis: ["fire","rocket","zap","muscle","raised_hands","clap","100","boom","exploding_head"] },
+      { label: "Agree", position: 3, emojis: ["thumbsup","+1","white_check_mark","heavy_check_mark","ok_hand","handshake","pray"] },
+      { label: "Funny", position: 4, emojis: ["joy","rofl","sweat_smile","laughing","grinning","smile","slightly_smiling_face","lol"] },
+      { label: "Thinking", position: 5, emojis: ["thinking_face","eyes","face_with_monocle","nerd_face","brain","question","grey_question"] },
+      { label: "Negative", position: 6, emojis: ["thumbsdown","-1","disappointed","cry","sob","rage","face_with_symbols_on_mouth","no_entry","x"] },
+      { label: "Other", position: 7, emojis: [] },
+    ];
+  }
+
+  // Sort by position
+  GROUPS.sort((a, b) => a.position - b.position);
+
+  // ── Physics setup ─────────────────────────────────────────────────────────
   const { Engine, Bodies, Body, Composite } = Matter;
 
   const CANVAS_HEIGHT = 440;
@@ -84,7 +198,6 @@ onMounted(() => {
   const GRID_COLOR = rootStyle.getPropertyValue("--grid").trim();
   const imageCache: Record<string, HTMLImageElement> = {};
 
-  // ── Physics engine ──────────────────────────────────────────────────────────
   const engine = Engine.create({ gravity: { x: 0, y: 1.5 } });
   const world = engine.world;
 
@@ -103,18 +216,6 @@ onMounted(() => {
   let emojiCounts: Record<string, number> = {};
   let emojiMeta: Record<string, { unicode?: string; url?: string }> = {};
   let grouped = false;
-
-  // ── Emoji groups ────────────────────────────────────────────────────────────
-  const GROUPS = [
-    { label: "Love",      emojis: ["heart","hearts","heart_eyes","sparkling_heart","two_hearts","revolving_hearts","heartpulse","orange_heart","yellow_heart","green_heart","blue_heart","purple_heart"] },
-    { label: "Celebrate", emojis: ["tada","confetti_ball","partying_face","balloon","fireworks","sparkles","star","star2","dizzy","trophy"] },
-    { label: "Hype",      emojis: ["fire","rocket","zap","muscle","raised_hands","clap","100","boom","exploding_head"] },
-    { label: "Agree",     emojis: ["thumbsup","+1","white_check_mark","heavy_check_mark","ok_hand","handshake","pray"] },
-    { label: "Funny",     emojis: ["joy","rofl","sweat_smile","laughing","grinning","smile","slightly_smiling_face","lol"] },
-    { label: "Thinking",  emojis: ["thinking_face","eyes","face_with_monocle","nerd_face","brain","question","grey_question"] },
-    { label: "Negative",  emojis: ["thumbsdown","-1","disappointed","cry","sob","rage","face_with_symbols_on_mouth","no_entry","x"] },
-    { label: "Other",     emojis: [] as string[] },
-  ];
 
   function groupIndexFor(emojiName: string): number {
     const base = emojiName.replace(/::?skin-tone-\d$/, "");
@@ -163,7 +264,7 @@ onMounted(() => {
     };
   }
 
-  // ── Toggle grouped mode ─────────────────────────────────────────────────────
+  // ── Toggle grouped mode ───────────────────────────────────────────────────
   _toggleMode = () => {
     grouped = !grouped;
     document.getElementById("modeBtn")!.textContent = grouped ? "Mix" : "Group";
@@ -190,7 +291,7 @@ onMounted(() => {
     return TWEMOJI_BASE + codepoints.join("-") + ".svg";
   }
 
-  // ── Emoji element creation ──────────────────────────────────────────────────
+  // ── Emoji element creation ────────────────────────────────────────────────
   function createEmojiImg(src: string, alt: string): HTMLImageElement {
     if (imageCache[src]) return imageCache[src].cloneNode() as HTMLImageElement;
     const img = document.createElement("img");
@@ -225,7 +326,7 @@ onMounted(() => {
     return el;
   }
 
-  // ── Stats ───────────────────────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
   function updateStats() {
     document.getElementById("totalOut")!.textContent = String(total);
     const topEl = document.getElementById("topOut")!;
@@ -249,7 +350,7 @@ onMounted(() => {
     document.getElementById("rateOut")!.textContent = (countWindow.length / 5).toFixed(1) + "/s";
   }, 500);
 
-  // ── Add / remove reactions ──────────────────────────────────────────────────
+  // ── Add / remove reactions ────────────────────────────────────────────────
   function addReaction(msg: any) {
     const gIdx = groupIndexFor(msg.emoji);
     const bounds = groupBounds(gIdx);
@@ -300,7 +401,7 @@ onMounted(() => {
     }
   }
 
-  // ── Simulate ────────────────────────────────────────────────────────────────
+  // ── Simulate ──────────────────────────────────────────────────────────────
   const SIM_EMOJI = [
     "heart","heart","heart","fire","fire","fire","thumbsup","thumbsup","thumbsup","thumbsup",
     "+1","+1","tada","tada","joy","joy","rocket","rocket","100","100",
@@ -326,7 +427,6 @@ onMounted(() => {
     "blue_heart":"💙","green_heart":"💚","yellow_heart":"💛",
   };
 
-  // Expose simulate globally for dev testing
   (window as any).simulate = (count = 30) => {
     for (let i = 0; i < count; i++) {
       const emoji = SIM_EMOJI[Math.floor(Math.random() * SIM_EMOJI.length)];
@@ -335,7 +435,7 @@ onMounted(() => {
     }
   };
 
-  // ── Drawing ─────────────────────────────────────────────────────────────────
+  // ── Drawing ───────────────────────────────────────────────────────────────
   function drawBg() {
     const W = canvas.width;
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, CANVAS_HEIGHT);
@@ -357,7 +457,7 @@ onMounted(() => {
     ctx.beginPath(); ctx.moveTo(PADDING, groundY()); ctx.lineTo(canvas.width - PADDING, groundY()); ctx.stroke();
   }
 
-  // ── Render loop ─────────────────────────────────────────────────────────────
+  // ── Render loop ───────────────────────────────────────────────────────────
   function frame() {
     Engine.update(engine, 1000 / 60);
     drawBg();
@@ -375,7 +475,7 @@ onMounted(() => {
     requestAnimationFrame(frame);
   }
 
-  // ── Reset / resize ──────────────────────────────────────────────────────────
+  // ── Reset / resize ────────────────────────────────────────────────────────
   function clearPit() {
     for (const d of drops) {
       d.el.remove();
@@ -411,14 +511,36 @@ onMounted(() => {
   resize();
   requestAnimationFrame(frame);
 
-  // ── WebSocket connection ────────────────────────────────────────────────────
+  // ── WebSocket connection ──────────────────────────────────────────────────
   const statusDot = document.getElementById("statusDot")!;
   const statusText = document.getElementById("statusText")!;
   const isSecure = location.protocol === "https:";
-  const WS_URL = `${isSecure ? "wss" : "ws"}://${location.host}/_ws`;
 
-  function connect() {
-    const ws = new WebSocket(WS_URL);
+  let currentWs: WebSocket | null = null;
+
+  async function connect() {
+    if (currentWs) {
+      currentWs.onclose = null;
+      currentWs.close();
+    }
+
+    clearPit();
+
+    // Get a one-time ticket for WS auth (httpOnly cookie can't be read by JS)
+    let ticket = "";
+    try {
+      const res = await fetch("/api/auth/ws-ticket", { method: "POST" });
+      const data = await res.json();
+      ticket = data.ticket;
+    } catch {
+      statusText.textContent = "AUTH ERROR";
+      statusDot.className = "power-led error";
+      return;
+    }
+
+    const wsUrl = `${isSecure ? "wss" : "ws"}://${location.host}/_ws?ticket=${encodeURIComponent(ticket)}&scope=${scope.value}`;
+    const ws = new WebSocket(wsUrl);
+    currentWs = ws;
 
     ws.onopen = () => {
       statusDot.className = "power-led on";
@@ -428,7 +550,12 @@ onMounted(() => {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        if (msg.type === "error") {
+          console.error("[ws] server error:", msg.message);
+          return;
+        }
         if (msg.type === "history") {
+          clearPit();
           msg.reactions.forEach((r: any, i: number) => {
             setTimeout(() => addReaction({ type: "reaction", ...r }), i * 80);
           });
@@ -454,6 +581,70 @@ onMounted(() => {
     };
   }
 
+  _reconnect = () => connect();
   connect();
 });
 </script>
+
+<style scoped>
+.landing {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.landing-tagline {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 18px;
+  color: var(--text-label);
+  margin-bottom: 32px;
+}
+
+.landing-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-slack {
+  display: inline-block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  text-decoration: none;
+  color: #fff;
+  background: #4A154B;
+  padding: 14px 28px;
+  border-radius: 8px;
+  letter-spacing: 0.05em;
+  transition: background 0.2s;
+}
+
+.btn-slack:hover {
+  background: #611f69;
+}
+
+.btn-slack-secondary {
+  background: var(--shell-dark);
+  color: var(--text-label);
+}
+
+.btn-slack-secondary:hover {
+  background: var(--shell-edge);
+  color: var(--text-lcd);
+}
+
+.user-badge {
+  font-size: 11px;
+  color: var(--text-label);
+  background: var(--stat-bg);
+  border: 1px solid var(--stat-border);
+  border-radius: 12px;
+  padding: 4px 10px;
+}
+
+.btn-link {
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+</style>

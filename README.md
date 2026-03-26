@@ -1,6 +1,6 @@
 # Emoji Pit
 
-Real-time Slack emoji reaction visualizer with Matter.js 2D physics. Reactions fall and pile up in sentiment groups with realistic collision and rotation.
+Real-time Slack emoji reaction visualizer with Matter.js 2D physics. Reactions fall and pile up in configurable sentiment groups with realistic collision and rotation. Supports multiple Slack workspaces via OAuth.
 
 ## Setup
 
@@ -9,18 +9,24 @@ Real-time Slack emoji reaction visualizer with Matter.js 2D physics. Reactions f
 1. Go to https://api.slack.com/apps → **Create New App** → **From scratch**
 2. Under **OAuth & Permissions**, add these **Bot Token Scopes**:
    - `reactions:read`
-   - `channels:history` (to listen to public channels)
-3. Under **Event Subscriptions** → enable, then **Subscribe to bot events**:
+   - `emoji:read`
+   - `chat:write`
+   - `channels:history`
+   - `users:read`
+3. Under **OAuth & Permissions** → add a **Redirect URL**: `https://your-domain.com/api/slack/oauth`
+4. Under **Event Subscriptions** → enable, set Request URL to `https://your-domain.com/api/slack/events`, then **Subscribe to bot events**:
    - `reaction_added`
-4. Under **Socket Mode** → enable it, generate an **App-Level Token** with `connections:write` scope
-5. Install the app to your workspace
-6. Copy the three tokens
+   - `reaction_removed`
+   - `emoji_changed`
+   - `app_home_opened`
+5. Under **Sign in with Slack** → add a **Redirect URL**: `https://your-domain.com/api/auth/callback`
+6. Copy your **Client ID**, **Client Secret**, and **Signing Secret**
 
 ### 2. Configure
 
 ```bash
 cp .env.example .env
-# Fill in your three tokens
+# Fill in SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET, BASE_URL
 ```
 
 ### 3. Run
@@ -30,26 +36,22 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 — reactions from any channel the bot is in will fall in real-time.
+Open http://localhost:3000 — you'll see a landing page with "Add to Slack" and "Sign in with Slack" buttons.
 
-### 4. Invite the bot to a channel
+### 4. Install to a workspace
 
-```
-/invite @your-app-name
-```
-
-Now react to any message in that channel and watch the emoji fall.
+Click "Add to Slack" to install the app. This creates an OAuth installation and redirects you to the dashboard. Invite the bot to channels where you want to track reactions.
 
 ## How it works
 
 ```
 Slack workspace
-     │  reaction_added event (Socket Mode — no public URL needed)
+     │  reaction_added event (HTTP Events API)
      ▼
-server/plugins/slack.ts (Slack Bolt + Nuxt Nitro)
+server/api/slack/events.post.ts (Nitro API route)
      │  EventEmitter bus
      ▼
-server/routes/_ws.ts (Nitro WebSocket)
+server/routes/_ws.ts (Nitro WebSocket, session-scoped)
      │  WebSocket broadcast
      ▼
 pages/index.vue (browser)
@@ -58,7 +60,16 @@ pages/index.vue (browser)
 Emoji pit — reactions fall and pile up with 2D physics
 ```
 
-## Emoji groups
+## Features
+
+- **Multi-workspace**: Install in multiple Slack workspaces via OAuth
+- **Sign in with Slack**: Users authenticate to view their workspace's pit
+- **Scope toggle**: View all workspace reactions or just your own
+- **Configurable buckets**: Admins set workspace-default emoji groups, users can override with personal buckets
+- **App Home**: Stats dashboard in Slack with top emoji and bucket config summary
+- **Real-time**: WebSocket streaming with Matter.js physics
+
+## Default emoji groups
 
 | Column   | Examples                              |
 |----------|---------------------------------------|
@@ -71,11 +82,25 @@ Emoji pit — reactions fall and pile up with 2D physics
 | Negative | 👎 😢 😡                             |
 | Other    | everything else                       |
 
-## Deploy
+Groups are configurable per workspace and per user at `/settings`.
 
-For a shared dashboard (e.g. on a TV in the office), deploy to any Node.js host and set the three env vars.
+## Deploy
 
 ```bash
 npm run build
 node .output/server/index.mjs
+```
+
+For Laravel Forge with PM2, use `instances: 1` and `exec_mode: "fork"` (single process required for in-memory event bus).
+
+Nginx needs WebSocket upgrade headers for the `/_ws` path:
+
+```nginx
+location /_ws {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
 ```
