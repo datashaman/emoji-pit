@@ -1,6 +1,15 @@
 export default defineNuxtConfig({
   ssr: true,
 
+  runtimeConfig: {
+    slackClientId: process.env.SLACK_CLIENT_ID || "",
+    slackClientSecret: process.env.SLACK_CLIENT_SECRET || "",
+    slackSigningSecret: process.env.SLACK_SIGNING_SECRET || "",
+    public: {
+      baseUrl: process.env.BASE_URL || "http://localhost:3000",
+    },
+  },
+
   nitro: {
     preset: "node-server",
     experimental: {

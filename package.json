@@ -12,7 +12,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@slack/bolt": "^3.19.0",
+    "@slack/web-api": "^7.15.0",
     "better-sqlite3": "^12.8.0",
     "dotenv": "^17.3.1",
     "gemoji": "^8.1.0",

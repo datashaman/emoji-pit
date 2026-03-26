@@ -1,7 +1,6 @@
 import { nameToEmoji } from "gemoji";
-import type bolt from "@slack/bolt";
-
-const customEmoji: Record<string, string> = {};
+import { WebClient } from "@slack/web-api";
+import { getCustomEmojiMap, upsertCustomEmoji, removeCustomEmoji } from "./db";
 
 // Slack names that don't match gemoji — map to the gemoji name
 const SLACK_ALIASES: Record<string, string> = {
@@ -33,10 +32,12 @@ const SKIN_TONES: Record<string, string> = {
   "skin-tone-6": "\u{1F3FF}",
 };
 
-export function resolveEmoji(name: string): {
-  unicode?: string;
-  url?: string;
-} {
+export function resolveEmoji(
+  teamId: string,
+  name: string
+): { unicode?: string; url?: string } {
+  const customEmoji = getCustomEmojiMap(teamId);
+
   if (customEmoji[name]) return { url: customEmoji[name] };
 
   let baseName = name;
@@ -56,19 +57,21 @@ export function resolveEmoji(name: string): {
 }
 
 export async function loadCustomEmoji(
-  app: InstanceType<typeof bolt.App>
+  teamId: string,
+  botToken: string
 ): Promise<void> {
   try {
-    const result = await app.client.emoji.list();
+    const client = new WebClient(botToken);
+    const result = await client.emoji.list();
     if (result.ok && result.emoji) {
+      let count = 0;
       for (const [name, value] of Object.entries(result.emoji)) {
         if (typeof value === "string" && !value.startsWith("alias:")) {
-          customEmoji[name] = value;
+          upsertCustomEmoji(teamId, name, value);
+          count++;
         }
       }
-      console.log(
-        `[emoji] loaded ${Object.keys(customEmoji).length} custom emoji`
-      );
+      console.log(`[emoji] loaded ${count} custom emoji for team ${teamId}`);
     }
   } catch (err) {
     console.warn(
@@ -78,10 +81,14 @@ export async function loadCustomEmoji(
   }
 }
 
-export function setCustomEmoji(name: string, value: string): void {
-  customEmoji[name] = value;
+export function setCustomEmoji(
+  teamId: string,
+  name: string,
+  url: string
+): void {
+  upsertCustomEmoji(teamId, name, url);
 }
 
-export function deleteCustomEmoji(name: string): void {
-  delete customEmoji[name];
+export function deleteCustomEmoji(teamId: string, name: string): void {
+  removeCustomEmoji(teamId, name);
 }
