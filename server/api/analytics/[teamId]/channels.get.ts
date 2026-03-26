@@ -41,7 +41,11 @@ export default defineEventHandler(async (event) => {
   }
 
   // If empty set returned (missing_scope), signal re-auth needed
+  // TV mode: show unfiltered channel IDs rather than nothing
   if (allowedChannels.size === 0) {
+    if (isTvMode) {
+      return { channels: rows.slice(0, 5) };
+    }
     return { channels: [], scope_warning: true };
   }
 

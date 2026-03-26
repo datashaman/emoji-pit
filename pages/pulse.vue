@@ -43,7 +43,7 @@
         <PulseTopReactions :reactions="topReactionsData" />
         <PulseTopChannels
           :channels="topChannelsData"
-          :scope-warning="channelScopeWarning"
+          :scope-warning="!isTvMode && channelScopeWarning"
         />
         <PulseWeeklyTrend :days="weeklyTrendData" />
       </div>
