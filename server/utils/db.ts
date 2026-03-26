@@ -9,6 +9,15 @@ export interface ReactionRecord {
   url?: string;
   team_id: string;
   user_id: string;
+  channel?: string;
+}
+
+export interface TvTokenRecord {
+  token: string;
+  team_id: string;
+  label: string;
+  created_by: string;
+  created_at: number;
 }
 
 export interface Installation {
@@ -102,6 +111,15 @@ db.exec(`
     is_admin    INTEGER NOT NULL DEFAULT 0,
     created_at  INTEGER DEFAULT (unixepoch())
   );
+
+  CREATE TABLE IF NOT EXISTS tv_tokens (
+    token       TEXT PRIMARY KEY,
+    team_id     TEXT NOT NULL,
+    label       TEXT NOT NULL DEFAULT '',
+    created_by  TEXT NOT NULL,
+    created_at  INTEGER DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_tv_tokens_team ON tv_tokens(team_id);
 `);
 
 // ── Migration: handle old reactions table without team_id/user_id ─────────
@@ -131,24 +149,33 @@ if (!hasTeamId && columns.length > 0) {
   console.log("[db] migrated reactions table to include team_id/user_id");
 }
 
-// Create indexes after migration (safe now that team_id column exists)
+// ── Migration: add channel column to reactions ──────────────────────────────
+const hasChannel = columns.some((c) => c.name === "channel");
+if (!hasChannel && columns.length > 0) {
+  db.exec(`ALTER TABLE reactions ADD COLUMN channel TEXT`);
+  console.log("[db] migrated reactions table to include channel");
+}
+
+// Create indexes after migrations (safe now that all columns exist)
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_reactions_team ON reactions(team_id);
   CREATE INDEX IF NOT EXISTS idx_reactions_team_user ON reactions(team_id, user_id);
+  CREATE INDEX IF NOT EXISTS idx_reactions_team_created ON reactions(team_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_reactions_team_channel_created ON reactions(team_id, channel, created_at);
 `);
 
 // ── Reactions ────────────────────────────────────────────────────────────────
 export const stmtInsertReaction = db.prepare(
-  "INSERT INTO reactions (team_id, user_id, emoji, unicode, url) VALUES (?, ?, ?, ?, ?)"
+  "INSERT INTO reactions (team_id, user_id, emoji, unicode, url, channel) VALUES (?, ?, ?, ?, ?, ?)"
 );
 export const stmtDeleteOneReaction = db.prepare(
   "DELETE FROM reactions WHERE id = (SELECT id FROM reactions WHERE team_id = ? AND emoji = ? LIMIT 1)"
 );
 export const stmtSelectTeamReactions = db.prepare(
-  "SELECT emoji, unicode, url, user_id FROM reactions WHERE team_id = ? ORDER BY id"
+  "SELECT emoji, unicode, url, user_id, channel FROM reactions WHERE team_id = ? ORDER BY id"
 );
 export const stmtSelectUserReactions = db.prepare(
-  "SELECT emoji, unicode, url, user_id FROM reactions WHERE team_id = ? AND user_id = ? ORDER BY id"
+  "SELECT emoji, unicode, url, user_id, channel FROM reactions WHERE team_id = ? AND user_id = ? ORDER BY id"
 );
 export const stmtDeleteTeamReactions = db.prepare(
   "DELETE FROM reactions WHERE team_id = ?"
@@ -323,5 +350,77 @@ export function removeCustomEmoji(teamId: string, name: string): void {
 export function clearCustomEmoji(teamId: string): void {
   stmtDeleteCustomEmojiTeam.run(teamId);
 }
+
+// ── TV Tokens ─────────────────────────────────────────────────────────────
+const stmtInsertTvToken = db.prepare(
+  "INSERT INTO tv_tokens (token, team_id, label, created_by) VALUES (?, ?, ?, ?)"
+);
+const stmtGetTvToken = db.prepare(
+  "SELECT * FROM tv_tokens WHERE token = ?"
+);
+const stmtListTvTokens = db.prepare(
+  "SELECT * FROM tv_tokens WHERE team_id = ? ORDER BY created_at DESC"
+);
+const stmtDeleteTvToken = db.prepare(
+  "DELETE FROM tv_tokens WHERE token = ? AND team_id = ?"
+);
+
+export function createTvToken(
+  teamId: string,
+  label: string,
+  createdBy: string
+): TvTokenRecord {
+  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  stmtInsertTvToken.run(token, teamId, label, createdBy);
+  return stmtGetTvToken.get(token) as TvTokenRecord;
+}
+
+export function getTvTokenTeam(token: string): TvTokenRecord | undefined {
+  return stmtGetTvToken.get(token) as TvTokenRecord | undefined;
+}
+
+export function listTvTokens(teamId: string): TvTokenRecord[] {
+  return stmtListTvTokens.all(teamId) as TvTokenRecord[];
+}
+
+export function deleteTvToken(token: string, teamId: string): void {
+  stmtDeleteTvToken.run(token, teamId);
+}
+
+// ── Analytics Queries ─────────────────────────────────────────────────────
+export const stmtHeatmap = db.prepare(`
+  SELECT CAST(strftime('%H', created_at, 'unixepoch') AS INTEGER) as hour,
+         COUNT(*) as count
+  FROM reactions
+  WHERE team_id = ? AND created_at >= ?
+  GROUP BY hour
+`);
+
+export const stmtTopReactions = db.prepare(`
+  SELECT emoji, COUNT(*) as count
+  FROM reactions
+  WHERE team_id = ? AND created_at >= ?
+  GROUP BY emoji ORDER BY count DESC LIMIT 10
+`);
+
+export const stmtTopChannels = db.prepare(`
+  SELECT channel, COUNT(*) as count
+  FROM reactions
+  WHERE team_id = ? AND created_at >= ? AND channel IS NOT NULL
+  GROUP BY channel ORDER BY count DESC LIMIT 20
+`);
+
+export const stmtWeeklyTrend = db.prepare(`
+  SELECT strftime('%Y-%m-%d', created_at, 'unixepoch') as date,
+         COUNT(*) as count
+  FROM reactions
+  WHERE team_id = ? AND created_at >= ?
+  GROUP BY date ORDER BY date
+`);
+
+// ── Data Retention ────────────────────────────────────────────────────────
+export const stmtDeleteOldReactions = db.prepare(
+  "DELETE FROM reactions WHERE created_at < unixepoch('now', '-90 days')"
+);
 
 console.log(`[db] opened ${DB_PATH}`);

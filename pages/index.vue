@@ -38,6 +38,12 @@
       </div>
     </div>
 
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <NuxtLink to="/" class="tab active">Pit</NuxtLink>
+      <NuxtLink to="/pulse" class="tab">Pulse</NuxtLink>
+    </div>
+
     <!-- Screen -->
     <div class="screen-bezel">
       <div class="screen">
@@ -646,5 +652,36 @@ onMounted(async () => {
   text-decoration: none;
   display: inline-block;
   text-align: center;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.tab {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  background: var(--shell-dark);
+  color: var(--text-label);
+  border: none;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 20px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+}
+
+.tab.active {
+  background: var(--stat-bg);
+  color: var(--text-lcd);
+  border: 1px solid var(--stat-border);
+  border-bottom: none;
+}
+
+.tab:hover:not(.active) {
+  color: var(--text-lcd);
 }
 </style>
