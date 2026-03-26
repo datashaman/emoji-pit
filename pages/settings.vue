@@ -88,9 +88,15 @@
           v-for="(bucket, idx) in activeBuckets"
           :key="idx"
           class="bucket-card"
+          :class="{ 'bucket-other': isOtherBucket(bucket) }"
         >
           <div class="bucket-header">
+            <template v-if="isOtherBucket(bucket)">
+              <span class="bucket-label-fixed">Other</span>
+              <span class="bucket-label-hint">(catch-all for uncategorized emoji)</span>
+            </template>
             <input
+              v-else
               v-model="bucket.label"
               class="bucket-label-input"
               placeholder="Bucket name"
@@ -115,26 +121,46 @@
               >&times;</button>
             </div>
           </div>
-          <div class="emoji-tags">
+          <div v-if="!isOtherBucket(bucket)" class="emoji-tags">
             <span
               v-for="(emoji, ei) in bucket.emojis"
               :key="ei"
               class="emoji-tag"
             >
-              :{{ emoji }}:
+              <img
+                v-if="emojiLookup[emoji]?.url"
+                :src="emojiLookup[emoji].url"
+                :alt="emoji"
+                class="tag-emoji-img"
+              />
+              <img
+                v-else-if="emojiLookup[emoji]?.emoji"
+                :src="twemojiUrl(emojiLookup[emoji].emoji!)"
+                :alt="emoji"
+                class="tag-emoji-img"
+              />
+              <span v-else class="tag-emoji-text">:{{ emoji }}:</span>
               <button class="tag-remove" @click="removeEmoji(idx, ei)">&times;</button>
             </span>
-            <input
-              class="emoji-add-input"
-              placeholder="+ add emoji"
-              @keydown.enter="addEmoji(idx, $event)"
+            <EmojiPicker
+              v-if="emojiData"
+              :emojis="emojiData"
+              :exclude="allAssignedEmoji"
+              @select="(name: string) => addEmojiByName(idx, name)"
             />
+          </div>
+          <div v-else class="bucket-other-note">
+            Emoji not assigned to any other bucket will appear here automatically.
           </div>
         </div>
       </div>
 
       <div class="settings-actions">
         <button class="btn-pill" @click="addBucket">+ Add Bucket</button>
+        <label class="other-toggle">
+          <input type="checkbox" v-model="showOther" />
+          <span>Include "Other" bucket</span>
+        </label>
         <button class="btn-pill btn-primary" @click="save" :disabled="saving">
           {{ saving ? 'Saving...' : 'Save' }}
         </button>
@@ -164,6 +190,28 @@ interface Bucket {
   emojis: string[];
 }
 
+interface EmojiEntry {
+  name: string;
+  emoji?: string;
+  url?: string;
+  category: string;
+  tags?: string[];
+}
+
+interface EmojiData {
+  standard: EmojiEntry[];
+  custom: EmojiEntry[];
+}
+
+const TWEMOJI_BASE = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/";
+
+function twemojiUrl(unicode: string): string {
+  const codepoints = [...unicode]
+    .map((c) => c.codePointAt(0)!.toString(16))
+    .filter((cp) => cp !== "fe0f");
+  return TWEMOJI_BASE + codepoints.join("-") + ".svg";
+}
+
 const loading = ref(true);
 const session = ref<Session | null>(null);
 const tab = ref<'user' | 'team' | 'tv'>('user');
@@ -172,10 +220,50 @@ const userBuckets = ref<Bucket[]>([]);
 const saving = ref(false);
 const message = ref('');
 const isError = ref(false);
+const emojiData = ref<EmojiData | null>(null);
 
 const activeBuckets = computed(() =>
   tab.value === 'team' ? teamBuckets.value : userBuckets.value
 );
+
+// Lookup map for emoji name → visual data
+const emojiLookup = computed(() => {
+  if (!emojiData.value) return {} as Record<string, EmojiEntry>;
+  const map: Record<string, EmojiEntry> = {};
+  for (const e of emojiData.value.custom) map[e.name] = e;
+  for (const e of emojiData.value.standard) {
+    if (!map[e.name]) map[e.name] = e;
+  }
+  return map;
+});
+
+// All emoji currently assigned to non-Other buckets (for excluding from picker)
+const allAssignedEmoji = computed(() => {
+  const names: string[] = [];
+  for (const b of activeBuckets.value) {
+    if (!isOtherBucket(b)) {
+      names.push(...b.emojis);
+    }
+  }
+  return names;
+});
+
+// "Other" bucket toggle
+const showOther = ref(true);
+
+watch(showOther, (val) => {
+  const buckets = activeBuckets.value;
+  const otherIdx = buckets.findIndex((b) => isOtherBucket(b));
+  if (val && otherIdx === -1) {
+    buckets.push({ label: 'Other', emojis: [] });
+  } else if (!val && otherIdx !== -1) {
+    buckets.splice(otherIdx, 1);
+  }
+});
+
+function isOtherBucket(bucket: Bucket): boolean {
+  return bucket.label.toLowerCase() === 'other';
+}
 
 onMounted(async () => {
   try {
@@ -187,18 +275,26 @@ onMounted(async () => {
     }
     session.value = data;
 
-    const [teamRes, userRes] = await Promise.all([
+    const [teamRes, userRes, emojiRes] = await Promise.all([
       fetch(`/api/buckets/${data.team_id}`),
       fetch('/api/buckets/user'),
+      fetch(`/api/emoji/${data.team_id}`),
     ]);
 
     teamBuckets.value = await teamRes.json();
     userBuckets.value = await userRes.json();
 
+    if (emojiRes.ok) {
+      emojiData.value = await emojiRes.json();
+    }
+
     // If user has no overrides, start with a copy of team defaults
     if (userBuckets.value.length === 0) {
       userBuckets.value = JSON.parse(JSON.stringify(teamBuckets.value));
     }
+
+    // Sync "Other" toggle with current bucket state
+    showOther.value = activeBuckets.value.some((b) => isOtherBucket(b));
 
     // Load TV tokens for admins
     if (data.is_admin) {
@@ -212,11 +308,22 @@ onMounted(async () => {
 });
 
 function addBucket() {
-  activeBuckets.value.push({ label: '', emojis: [] });
+  // Insert before "Other" if it exists
+  const buckets = activeBuckets.value;
+  const otherIdx = buckets.findIndex((b) => isOtherBucket(b));
+  if (otherIdx !== -1) {
+    buckets.splice(otherIdx, 0, { label: '', emojis: [] });
+  } else {
+    buckets.push({ label: '', emojis: [] });
+  }
 }
 
 function removeBucket(idx: number) {
   activeBuckets.value.splice(idx, 1);
+  // If removing Other, update toggle
+  if (!activeBuckets.value.some((b) => isOtherBucket(b))) {
+    showOther.value = false;
+  }
 }
 
 function moveBucket(idx: number, dir: number) {
@@ -226,12 +333,8 @@ function moveBucket(idx: number, dir: number) {
   [arr[idx], arr[target]] = [arr[target], arr[idx]];
 }
 
-function addEmoji(bucketIdx: number, event: Event) {
-  const input = event.target as HTMLInputElement;
-  const name = input.value.trim().replace(/^:/, '').replace(/:$/, '');
-  if (!name) return;
+function addEmojiByName(bucketIdx: number, name: string) {
   activeBuckets.value[bucketIdx].emojis.push(name);
-  input.value = '';
 }
 
 function removeEmoji(bucketIdx: number, emojiIdx: number) {
@@ -409,6 +512,9 @@ async function resetToDefaults() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .bucket-card {
@@ -506,20 +612,54 @@ async function resetToDefaults() {
   color: var(--led-red);
 }
 
-.emoji-add-input {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  background: transparent;
-  border: 1px dashed var(--stat-border);
-  color: var(--text-lcd);
-  border-radius: 12px;
-  padding: 4px 10px;
-  width: 120px;
-  outline: none;
+.tag-emoji-img {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
 }
 
-.emoji-add-input:focus {
-  border-color: var(--text-lcd);
+.tag-emoji-text {
+  font-size: 11px;
+}
+
+.bucket-other {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.bucket-label-fixed {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: var(--text-lcd);
+  padding: 4px 0;
+}
+
+.bucket-label-hint {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 8px;
+}
+
+.bucket-other-note {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+.other-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-label);
+  cursor: pointer;
+}
+
+.other-toggle input {
+  cursor: pointer;
 }
 
 .settings-actions {
