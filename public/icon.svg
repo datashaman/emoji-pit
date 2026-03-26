@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Pit backdrop only -->
+  <path d="M96 160 L416 160 L380 400 L132 400 Z" fill="#1a2e1a" opacity="0.6"/>
+
+  <!-- Pit shape: trapezoid/funnel -->
+  <path d="M96 160 L416 160 L380 400 L132 400 Z" fill="none" stroke="#4a8a3a" stroke-width="4" opacity="0.5"/>
+
+  <!-- Ground line -->
+  <path d="M132 400 L380 400" stroke="#5a9a3a" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Piled circles at bottom (emoji stand-ins) -->
+  <!-- Bottom row -->
+  <circle cx="175" cy="372" r="22" fill="#ef4444" opacity="0.9"/>
+  <circle cx="222" cy="375" r="20" fill="#facc15" opacity="0.9"/>
+  <circle cx="268" cy="370" r="23" fill="#f97316" opacity="0.9"/>
+  <circle cx="315" cy="374" r="21" fill="#22c55e" opacity="0.9"/>
+  <circle cx="358" cy="373" r="20" fill="#3b82f6" opacity="0.9"/>
+
+  <!-- Second row -->
+  <circle cx="198" cy="335" r="19" fill="#a855f7" opacity="0.85"/>
+  <circle cx="245" cy="330" r="22" fill="#ef4444" opacity="0.85"/>
+  <circle cx="292" cy="333" r="20" fill="#facc15" opacity="0.85"/>
+  <circle cx="338" cy="336" r="18" fill="#ec4899" opacity="0.85"/>
+
+  <!-- Third row -->
+  <circle cx="222" cy="296" r="18" fill="#22c55e" opacity="0.8"/>
+  <circle cx="268" cy="292" r="20" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="312" cy="298" r="17" fill="#f97316" opacity="0.8"/>
+
+  <!-- Falling circles -->
+  <circle cx="210" cy="220" r="18" fill="#ef4444" opacity="0.7">
+    <animateTransform attributeName="transform" type="rotate" from="-10 210 220" to="-10 210 220" dur="1s"/>
+  </circle>
+  <circle cx="310" cy="170" r="16" fill="#facc15" opacity="0.5"/>
+  <circle cx="256" cy="110" r="14" fill="#22c55e" opacity="0.35"/>
+
+  <!-- Motion lines on falling circles -->
+  <line x1="210" y1="198" x2="210" y2="185" stroke="#5a9a3a" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <line x1="218" y1="200" x2="220" y2="188" stroke="#5a9a3a" stroke-width="1.5" opacity="0.3" stroke-linecap="round"/>
+  <line x1="310" y1="150" x2="310" y2="140" stroke="#5a9a3a" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="256" y1="92" x2="256" y2="84" stroke="#5a9a3a" stroke-width="1.5" opacity="0.2" stroke-linecap="round"/>
+</svg>

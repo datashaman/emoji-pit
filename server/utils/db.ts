@@ -8,7 +8,7 @@ export interface ReactionRecord {
   url?: string;
 }
 
-const DATA_DIR = fs.existsSync("/data") ? "/data" : process.cwd();
+const DATA_DIR = process.env.DATA_DIR || (fs.existsSync("/data") ? "/data" : process.cwd());
 const DB_PATH = path.join(DATA_DIR, "emoji-pit.db");
 
 export const db = new Database(DB_PATH);
