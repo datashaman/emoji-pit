@@ -409,6 +409,9 @@ async function resetToDefaults() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .bucket-card {
