@@ -6,7 +6,7 @@ export default defineEventHandler((event) => {
 
   const params = new URLSearchParams({
     client_id: config.slackClientId,
-    scope: "reactions:read,emoji:read,chat:write,channels:history,users:read",
+    scope: "reactions:read,emoji:read,chat:write,channels:history,channels:read,users:read",
     redirect_uri: `${config.public.baseUrl}/api/slack/oauth`,
     state,
   });

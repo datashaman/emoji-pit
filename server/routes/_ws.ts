@@ -1,15 +1,30 @@
 import { bus } from "../utils/bus";
-import { loadHistory } from "../utils/db";
+import { loadHistory, getTvTokenTeam } from "../utils/db";
 import { resolveEmoji } from "../utils/emoji";
 import { consumeTicket } from "../api/auth/ws-ticket.post";
 
 export default defineWebSocketHandler({
   open(peer) {
     const url = new URL(peer.request?.url || "", "http://localhost");
-    const ticket = url.searchParams.get("ticket") || "";
     const scope = url.searchParams.get("scope") || "team";
 
-    const session = consumeTicket(ticket);
+    // Try TV token auth first, then ticket auth
+    const tvToken = url.searchParams.get("tv_token") || "";
+    const ticket = url.searchParams.get("ticket") || "";
+
+    let session: { team_id: string; user_id: string } | undefined;
+
+    if (tvToken) {
+      const tvRecord = getTvTokenTeam(tvToken);
+      if (tvRecord) {
+        session = { team_id: tvRecord.team_id, user_id: "tv" };
+      }
+    }
+
+    if (!session && ticket) {
+      session = consumeTicket(ticket);
+    }
+
     if (!session) {
       peer.send(JSON.stringify({ type: "error", message: "Invalid or expired ticket" }));
       peer.close(4001, "Invalid ticket");

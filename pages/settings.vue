@@ -35,10 +35,55 @@
           :class="{ active: tab === 'team' }"
           @click="tab = 'team'"
         >Workspace Defaults</button>
+        <button
+          v-if="session.is_admin"
+          class="tab"
+          :class="{ active: tab === 'tv' }"
+          @click="tab = 'tv'"
+        >TV Mode</button>
+      </div>
+
+      <!-- TV Mode panel -->
+      <div v-if="tab === 'tv'" class="tv-panel">
+        <p class="tv-description">
+          Generate a shareable link to display Emoji Pit on a TV or ambient screen.
+          No login required &mdash; anyone with the link can view.
+        </p>
+
+        <div class="tv-tokens-list">
+          <div v-for="t in tvTokens" :key="t.token" class="tv-token-card">
+            <div class="tv-token-info">
+              <span class="tv-token-label">{{ t.label }}</span>
+              <span class="tv-token-preview">{{ t.token_preview }}</span>
+            </div>
+            <div class="tv-token-actions">
+              <button class="btn-pill btn-sm" @click="copyTvUrl(t.token)">Copy URL</button>
+              <button class="btn-pill btn-sm btn-danger-outline" @click="revokeTvToken(t.token)">Revoke</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <input
+            v-model="tvLabel"
+            class="tv-label-input"
+            placeholder="Display name (e.g. Office TV)"
+          />
+          <button class="btn-pill btn-primary" @click="generateTvToken" :disabled="generatingTv">
+            {{ generatingTv ? 'Generating...' : 'Generate Link' }}
+          </button>
+        </div>
+
+        <div v-if="newTvUrl" class="tv-new-url">
+          <p class="tv-url-label">New TV URL (copy now &mdash; the full token won't be shown again):</p>
+          <code class="tv-url">{{ newTvUrl }}</code>
+        </div>
+
+        <p v-if="message" class="settings-message" :class="{ error: isError }">{{ message }}</p>
       </div>
 
       <!-- Bucket editor -->
-      <div class="bucket-list">
+      <div v-show="tab !== 'tv'" class="bucket-list">
         <div
           v-for="(bucket, idx) in activeBuckets"
           :key="idx"
@@ -121,7 +166,7 @@ interface Bucket {
 
 const loading = ref(true);
 const session = ref<Session | null>(null);
-const tab = ref<'user' | 'team'>('user');
+const tab = ref<'user' | 'team' | 'tv'>('user');
 const teamBuckets = ref<Bucket[]>([]);
 const userBuckets = ref<Bucket[]>([]);
 const saving = ref(false);
@@ -153,6 +198,11 @@ onMounted(async () => {
     // If user has no overrides, start with a copy of team defaults
     if (userBuckets.value.length === 0) {
       userBuckets.value = JSON.parse(JSON.stringify(teamBuckets.value));
+    }
+
+    // Load TV tokens for admins
+    if (data.is_admin) {
+      await loadTvTokens();
     }
   } catch {
     message.value = 'Failed to load settings';
@@ -216,6 +266,79 @@ async function save() {
     isError.value = true;
   }
   saving.value = false;
+}
+
+// ── TV Token management ──────────────────────────────────────────────────
+interface TvToken {
+  token: string;
+  token_preview: string;
+  label: string;
+  created_at: number;
+}
+
+const tvTokens = ref<TvToken[]>([]);
+const tvLabel = ref('');
+const generatingTv = ref(false);
+const newTvUrl = ref('');
+
+async function loadTvTokens() {
+  try {
+    const res = await fetch('/api/tv/tokens');
+    if (res.ok) {
+      tvTokens.value = await res.json();
+    }
+  } catch { /* ignore */ }
+}
+
+async function generateTvToken() {
+  generatingTv.value = true;
+  message.value = '';
+  newTvUrl.value = '';
+  try {
+    const res = await fetch('/api/tv/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: tvLabel.value || 'TV Display' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const baseUrl = window.location.origin;
+    newTvUrl.value = `${baseUrl}/pulse?tv=1&token=${data.token}&team=${session.value?.team_id}`;
+    tvLabel.value = '';
+    await loadTvTokens();
+    message.value = 'Token generated!';
+    isError.value = false;
+  } catch (err) {
+    message.value = (err as Error).message;
+    isError.value = true;
+  }
+  generatingTv.value = false;
+}
+
+async function revokeTvToken(token: string) {
+  if (!confirm('Revoke this TV token? The link will stop working.')) return;
+  try {
+    await fetch('/api/tv/token', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    await loadTvTokens();
+    message.value = 'Token revoked';
+    isError.value = false;
+  } catch (err) {
+    message.value = (err as Error).message;
+    isError.value = true;
+  }
+}
+
+function copyTvUrl(token: string) {
+  const baseUrl = window.location.origin;
+  const url = `${baseUrl}/pulse?tv=1&token=${token}&team=${session.value?.team_id}`;
+  navigator.clipboard.writeText(url).then(() => {
+    message.value = 'URL copied!';
+    isError.value = false;
+  });
 }
 
 async function resetToDefaults() {
@@ -441,5 +564,112 @@ async function resetToDefaults() {
   border: 1px solid var(--stat-border);
   border-radius: 12px;
   padding: 4px 10px;
+}
+
+/* ── TV Mode styles ─────────────────────────────────────────── */
+.tv-panel {
+  padding-top: 12px;
+}
+
+.tv-description {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--text-label);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.tv-tokens-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tv-token-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--stat-bg);
+  border: 1px solid var(--stat-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.tv-token-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tv-token-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--text-lcd);
+}
+
+.tv-token-preview {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.tv-token-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-sm {
+  font-size: 8px !important;
+  padding: 6px 12px !important;
+}
+
+.btn-danger-outline {
+  color: var(--led-red) !important;
+  border-color: var(--led-red) !important;
+}
+
+.btn-danger-outline:hover {
+  background: var(--led-red) !important;
+  color: #fff !important;
+}
+
+.tv-label-input {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  background: var(--stat-bg);
+  border: 1px solid var(--stat-border);
+  color: var(--text-lcd);
+  border-radius: 6px;
+  padding: 8px 12px;
+  outline: none;
+  width: 200px;
+}
+
+.tv-label-input:focus {
+  border-color: var(--text-lcd);
+}
+
+.tv-new-url {
+  margin-top: 12px;
+  background: var(--stat-bg);
+  border: 1px solid var(--stat-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.tv-url-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-label);
+  margin-bottom: 6px;
+}
+
+.tv-url {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-lcd);
+  word-break: break-all;
+  display: block;
 }
 </style>

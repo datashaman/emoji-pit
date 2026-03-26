@@ -64,7 +64,8 @@ export default defineEventHandler(async (event) => {
       slackEvent.user,
       slackEvent.reaction,
       resolved.unicode ?? null,
-      resolved.url ?? null
+      resolved.url ?? null,
+      slackEvent.item?.channel ?? null
     );
 
     bus.emit("broadcast", {
