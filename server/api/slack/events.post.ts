@@ -1,4 +1,5 @@
 import { WebClient } from "@slack/web-api";
+import type { KnownBlock } from "@slack/types";
 import { verifySlackSignature } from "../../utils/slack-verify";
 import { bus } from "../../utils/bus";
 import {
@@ -166,8 +167,7 @@ export default defineEventHandler(async (event) => {
           `${i + 1}. :${r.emoji.replace(/::?skin-tone-\d$/, "")}:  \u00d7 *${r.count}*`
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blocks: any[] = [
+      const blocks: KnownBlock[] = [
         {
           type: "header",
           text: { type: "plain_text", text: "Emoji Pit", emoji: true },
