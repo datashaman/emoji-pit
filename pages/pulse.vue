@@ -1,18 +1,14 @@
 <template>
   <!-- Loading -->
   <div v-if="authState === 'loading'" class="console">
-    <div class="console-header">
-      <div class="brand"><h1>Emoji Pit</h1></div>
-    </div>
+    <ConsoleHeader />
     <div class="pulse-body"><p>Loading...</p></div>
     <div class="model-label">EP-1000 &bull; Culture Pulse</div>
   </div>
 
   <!-- Not authenticated -->
   <div v-else-if="authState === 'unauthenticated'" class="console">
-    <div class="console-header">
-      <div class="brand"><h1>Emoji Pit</h1></div>
-    </div>
+    <ConsoleHeader />
     <div class="pulse-body">
       <p>Please <a href="/api/auth/login">sign in</a> to view analytics.</p>
     </div>
@@ -21,20 +17,15 @@
 
   <!-- Authenticated -->
   <div v-else class="console">
-    <div class="console-header">
-      <div class="brand">
-        <h1>Emoji Pit</h1>
-      </div>
-      <div class="header-right">
-        <span v-if="!isTvMode" class="user-badge">{{ session?.user_name }}</span>
-      </div>
-    </div>
+    <ConsoleHeader>
+      <span v-if="!isTvMode" class="user-badge">{{ session?.user_name }}</span>
+    </ConsoleHeader>
 
     <!-- Tab bar -->
-    <div v-if="!isTvMode" class="tab-bar">
-      <NuxtLink to="/" class="tab">Pit</NuxtLink>
-      <NuxtLink to="/pulse" class="tab active">Pulse</NuxtLink>
-    </div>
+    <PageTabs
+      v-if="!isTvMode"
+      :tabs="[{ to: '/', label: 'Pit' }, { to: '/pulse', label: 'Pulse' }]"
+    />
 
     <!-- Analytics grid -->
     <div class="pulse-body">
@@ -71,7 +62,7 @@ const session = ref<{ team_id: string; user_id: string; user_name: string } | nu
 const heatmapData = ref<{ hour: number; count: number }[]>(
   Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 }))
 );
-const topReactionsData = ref<{ emoji: string; count: number }[]>([]);
+const topReactionsData = ref<{ emoji: string; count: number; unicode?: string; url?: string }[]>([]);
 const topChannelsData = ref<{ channel: string; count: number }[]>([]);
 const channelScopeWarning = ref(false);
 const weeklyTrendData = ref<{ date: string; count: number }[]>([]);
@@ -232,37 +223,6 @@ async function fetchAllAnalytics() {
   }
 }
 
-.tab-bar {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.tab {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  background: var(--shell-dark);
-  color: var(--text-label);
-  border: none;
-  border-radius: 8px 8px 0 0;
-  padding: 10px 20px;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-decoration: none;
-}
-
-.tab.active {
-  background: var(--stat-bg);
-  color: var(--text-lcd);
-  border: 1px solid var(--stat-border);
-  border-bottom: none;
-}
-
-.tab:hover:not(.active) {
-  color: var(--text-lcd);
-}
-
 .tv-badge {
   position: fixed;
   bottom: 12px;
@@ -273,12 +233,4 @@ async function fetchAllAnalytics() {
   opacity: 0.5;
 }
 
-.user-badge {
-  font-size: 11px;
-  color: var(--text-label);
-  background: var(--stat-bg);
-  border: 1px solid var(--stat-border);
-  border-radius: 12px;
-  padding: 4px 10px;
-}
 </style>

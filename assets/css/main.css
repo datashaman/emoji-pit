@@ -13,8 +13,8 @@
   --screen-bg: #2a4a2a;
   --screen-glow: rgba(120, 220, 80, 0.08);
   --lcd-tint: rgba(120, 220, 80, 0.03);
-  --text-lcd: #3a5a1a;
-  --text-dim: #5a8a3a;
+  --text-lcd: #78c840;
+  --text-dim: #5a9a3a;
   --text-label: #8a8578;
   --accent-a: #ef4444;
   --accent-b: #facc15;
@@ -93,20 +93,6 @@ body {
 }
 
 /* ── Header area ────────────────────────────────────────────── */
-.console-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  padding: 0;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 h1 {
   font-family: 'Press Start 2P', monospace;
   font-size: 18px;
@@ -135,12 +121,6 @@ h1 {
   font-size: 13px;
   color: var(--text-label);
   letter-spacing: 0.05em;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 /* ── Screen bezel ───────────────────────────────────────────── */
@@ -409,6 +389,17 @@ button {
   margin-top: 12px;
   text-align: center;
   padding: 20px 0;
+}
+
+/* ── User badge ─────────────────────────────────────────────── */
+.user-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-label);
+  background: var(--stat-bg);
+  border: 1px solid var(--stat-border);
+  border-radius: 12px;
+  padding: 4px 10px;
 }
 
 /* ── Model label ────────────────────────────────────────────── */
