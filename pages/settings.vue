@@ -155,7 +155,7 @@
         </div>
       </div>
 
-      <div class="settings-actions">
+      <div v-show="tab !== 'tv'" class="settings-actions">
         <button class="btn-pill" @click="addBucket">+ Add Bucket</button>
         <label class="other-toggle">
           <input type="checkbox" v-model="showOther" />
