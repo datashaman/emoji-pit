@@ -10,7 +10,11 @@
         :key="r.emoji"
         class="bar-row"
       >
-        <span class="bar-label">:{{ r.emoji }}:</span>
+        <span class="bar-label">
+          <img v-if="r.url" :src="r.url" :alt="r.emoji" class="bar-emoji-img" />
+          <img v-else-if="r.unicode" :src="twemojiUrl(r.unicode)" :alt="r.emoji" class="bar-emoji-img" />
+          <span v-else>:{{ r.emoji }}:</span>
+        </span>
         <div class="bar-track">
           <div
             class="bar-fill"
@@ -27,6 +31,17 @@
 interface ReactionData {
   emoji: string;
   count: number;
+  unicode?: string;
+  url?: string;
+}
+
+const TWEMOJI_BASE = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/";
+
+function twemojiUrl(unicode: string): string {
+  const codepoints = [...unicode]
+    .map((c) => c.codePointAt(0)!.toString(16))
+    .filter((cp) => cp !== "fe0f");
+  return TWEMOJI_BASE + codepoints.join("-") + ".svg";
 }
 
 const props = defineProps<{
@@ -62,6 +77,15 @@ function barWidth(count: number): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bar-emoji-img {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
 }
 
 .bar-track {

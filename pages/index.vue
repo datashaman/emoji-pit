@@ -1,9 +1,7 @@
 <template>
   <!-- Landing page: not authenticated -->
   <div v-if="authState === 'loading'" class="console">
-    <div class="console-header">
-      <div class="brand"><h1>Emoji Pit</h1></div>
-    </div>
+    <ConsoleHeader />
     <div class="landing">
       <p>Loading...</p>
     </div>
@@ -11,9 +9,7 @@
   </div>
 
   <div v-else-if="authState === 'unauthenticated'" class="console">
-    <div class="console-header">
-      <div class="brand"><h1>Emoji Pit</h1></div>
-    </div>
+    <ConsoleHeader />
     <div class="landing">
       <p class="landing-tagline">Watch your Slack reactions pile up in real time</p>
       <div class="landing-buttons">
@@ -27,28 +23,23 @@
   <!-- Main app: authenticated -->
   <div v-else class="console">
     <!-- Header: brand + power LED -->
-    <div class="console-header">
-      <div class="brand">
-        <h1>Emoji Pit</h1>
-      </div>
-      <div class="header-right">
-        <span class="user-badge">{{ session.user_name }}</span>
-        <span class="status-text" id="statusText">Connecting...</span>
-        <div class="power-led" id="statusDot"></div>
-      </div>
-    </div>
+    <ConsoleHeader>
+      <span class="user-badge">{{ session.user_name }}</span>
+      <span class="status-text" id="statusText">Connecting...</span>
+      <div class="power-led" id="statusDot"></div>
+    </ConsoleHeader>
 
     <!-- Tab bar -->
-    <div class="tab-bar">
-      <NuxtLink to="/" class="tab active">Pit</NuxtLink>
-      <NuxtLink to="/pulse" class="tab">Pulse</NuxtLink>
-    </div>
+    <PageTabs :tabs="[{ to: '/', label: 'Pit' }, { to: '/pulse', label: 'Pulse' }]" />
 
     <!-- Screen -->
     <div class="screen-bezel">
       <div class="screen">
         <canvas id="rc"></canvas>
         <div class="emoji-layer" id="emojiLayer"></div>
+        <div class="empty-hint" id="emptyHint">
+          React to a message in Slack and watch it drop here
+        </div>
       </div>
     </div>
     <div class="axis" id="axisRow"></div>
@@ -73,11 +64,11 @@
 
       <!-- Buttons -->
       <div class="controls">
-        <button class="btn-pill" id="scopeBtn" @click="toggleScope">
+        <button class="btn-pill" id="scopeBtn" @click="toggleScope" :title="scope === 'team' ? 'Showing all team reactions — click to show only yours' : 'Showing your reactions — click to show all team'">
           {{ scope === 'team' ? 'Team' : 'Mine' }}
         </button>
-        <button class="btn-pill" id="modeBtn" @click="toggleMode">Group</button>
-        <button class="btn-pill" @click="resetAll">Reset</button>
+        <button class="btn-pill" id="modeBtn" @click="toggleMode" title="Sort emoji into bucket columns, or mix them together">Group</button>
+        <button class="btn-pill" @click="resetAll" title="Clear all reactions from the pit">Reset</button>
         <a href="/settings" class="btn-pill btn-link">Settings</a>
         <button class="btn-pill" @click="logout">Logout</button>
       </div>
@@ -333,6 +324,12 @@ onMounted(async () => {
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
+  const emptyHint = document.getElementById("emptyHint")!;
+
+  function updateEmptyHint() {
+    emptyHint.classList.toggle("hidden", total > 0);
+  }
+
   function updateStats() {
     document.getElementById("totalOut")!.textContent = String(total);
     const topEl = document.getElementById("topOut")!;
@@ -367,6 +364,7 @@ onMounted(async () => {
     emojiCounts[msg.emoji] = (emojiCounts[msg.emoji] || 0) + 1;
     if (msg.unicode || msg.url) emojiMeta[msg.emoji] = { unicode: msg.unicode, url: msg.url };
     updateStats();
+    updateEmptyHint();
 
     const el = createEmojiEl(msg);
     emojiLayer.appendChild(el);
@@ -395,6 +393,7 @@ onMounted(async () => {
         emojiCounts[msg.emoji] = Math.max(0, (emojiCounts[msg.emoji] || 0) - 1);
         if (emojiCounts[msg.emoji] === 0) { delete emojiCounts[msg.emoji]; delete emojiMeta[msg.emoji]; }
         updateStats();
+        updateEmptyHint();
 
         setTimeout(() => {
           d.el.remove();
@@ -492,6 +491,7 @@ onMounted(async () => {
     document.getElementById("totalOut")!.textContent = "0";
     document.getElementById("rateOut")!.textContent = "0/s";
     document.getElementById("topOut")!.textContent = "---";
+    updateEmptyHint();
   }
 
   _resetAll = () => {
@@ -577,13 +577,13 @@ onMounted(async () => {
 
     ws.onclose = () => {
       statusDot.className = "power-led";
-      statusText.textContent = "RECONNECTING...";
+      statusText.textContent = "RECONNECTING\u2026";
       setTimeout(connect, 2000);
     };
 
     ws.onerror = () => {
       statusDot.className = "power-led error";
-      statusText.textContent = "ERROR";
+      statusText.textContent = "CONNECTION LOST \u2013 RETRYING";
     };
   }
 
@@ -639,13 +639,23 @@ onMounted(async () => {
   color: var(--text-lcd);
 }
 
-.user-badge {
-  font-size: 11px;
-  color: var(--text-label);
-  background: var(--stat-bg);
-  border: 1px solid var(--stat-border);
-  border-radius: 12px;
-  padding: 4px 10px;
+.empty-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  color: var(--text-dim);
+  text-align: center;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.7;
+  transition: opacity 0.4s ease;
+}
+
+.empty-hint.hidden {
+  opacity: 0;
 }
 
 .btn-link {
@@ -654,34 +664,4 @@ onMounted(async () => {
   text-align: center;
 }
 
-.tab-bar {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.tab {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  background: var(--shell-dark);
-  color: var(--text-label);
-  border: none;
-  border-radius: 8px 8px 0 0;
-  padding: 10px 20px;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-decoration: none;
-}
-
-.tab.active {
-  background: var(--stat-bg);
-  color: var(--text-lcd);
-  border: 1px solid var(--stat-border);
-  border-bottom: none;
-}
-
-.tab:hover:not(.active) {
-  color: var(--text-lcd);
-}
 </style>

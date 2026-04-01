@@ -1,14 +1,11 @@
 <template>
   <div class="console">
-    <div class="console-header">
-      <div class="brand">
+    <ConsoleHeader>
+      <template #brand-prefix>
         <a href="/" class="back-link">&larr;</a>
-        <h1>Settings</h1>
-      </div>
-      <div class="header-right">
-        <span v-if="session" class="user-badge">{{ session.user_name }}</span>
-      </div>
-    </div>
+      </template>
+      <span v-if="session" class="user-badge">{{ session.user_name }}</span>
+    </ConsoleHeader>
 
     <!-- Loading -->
     <div v-if="loading" class="settings-body">
@@ -22,22 +19,22 @@
 
     <!-- Settings -->
     <div v-else class="settings-body">
-      <!-- Tab bar -->
-      <div class="tab-bar">
+      <!-- Section tabs -->
+      <div class="section-tabs">
         <button
-          class="tab"
+          class="section-tab"
           :class="{ active: tab === 'user' }"
           @click="tab = 'user'"
         >My Buckets</button>
         <button
           v-if="session.is_admin"
-          class="tab"
+          class="section-tab"
           :class="{ active: tab === 'team' }"
           @click="tab = 'team'"
         >Workspace Defaults</button>
         <button
           v-if="session.is_admin"
-          class="tab"
+          class="section-tab"
           :class="{ active: tab === 'tv' }"
           @click="tab = 'tv'"
         >TV Mode</button>
@@ -81,6 +78,12 @@
 
         <p v-if="message" class="settings-message" :class="{ error: isError }">{{ message }}</p>
       </div>
+
+      <!-- Bucket explainer -->
+      <p v-if="tab !== 'tv'" class="bucket-explainer">
+        Buckets group emoji into columns when "Group" mode is active in the Pit.
+        Drag reactions land in their assigned bucket. The "Other" bucket catches everything else.
+      </p>
 
       <!-- Bucket editor -->
       <div v-show="tab !== 'tv'" class="bucket-list">
@@ -482,30 +485,47 @@ async function resetToDefaults() {
   padding: 20px 0;
 }
 
-.tab-bar {
+.bucket-explainer {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-label);
+  line-height: 1.6;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--stat-bg);
+  border-left: 3px solid var(--text-dim);
+  border-radius: 0 6px 6px 0;
+}
+
+.section-tabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   margin-bottom: 20px;
 }
 
-.tab {
+.section-tab {
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  background: var(--shell-dark);
+  font-size: 8px;
+  background: none;
   color: var(--text-label);
-  border: none;
-  border-radius: 8px 8px 0 0;
-  padding: 10px 20px;
+  border: 1px solid var(--stat-border);
+  border-radius: 14px;
+  padding: 8px 16px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  transition: all 0.15s ease;
 }
 
-.tab.active {
-  background: var(--stat-bg);
+.section-tab.active {
+  background: var(--text-lcd);
+  color: var(--screen-bg);
+  border-color: var(--text-lcd);
+}
+
+.section-tab:hover:not(.active) {
   color: var(--text-lcd);
-  border: 1px solid var(--stat-border);
-  border-bottom: none;
+  border-color: var(--text-lcd);
 }
 
 .bucket-list {
@@ -669,22 +689,22 @@ async function resetToDefaults() {
   flex-wrap: wrap;
 }
 
-.btn-primary {
-  background: #4A154B !important;
-  color: #fff !important;
+.btn-pill.btn-primary {
+  background: #4A154B;
+  color: #fff;
 }
 
-.btn-primary:hover {
-  background: #611f69 !important;
+.btn-pill.btn-primary:hover {
+  background: #611f69;
 }
 
-.btn-primary:disabled {
+.btn-pill.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn-secondary {
-  background: var(--shell-edge) !important;
+.btn-pill.btn-secondary {
+  background: var(--shell-edge);
 }
 
 .settings-message {
@@ -695,15 +715,6 @@ async function resetToDefaults() {
 
 .settings-message.error {
   color: var(--led-red);
-}
-
-.user-badge {
-  font-size: 11px;
-  color: var(--text-label);
-  background: var(--stat-bg);
-  border: 1px solid var(--stat-border);
-  border-radius: 12px;
-  padding: 4px 10px;
 }
 
 /* ── TV Mode styles ─────────────────────────────────────────── */
